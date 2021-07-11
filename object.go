@@ -6,54 +6,16 @@ import (
 
 type Object struct {
 	lock      sync.Mutex
-	observers []ObjectObserver
+	observers []Observer
 
 	object interface{}
-}
-
-type ObjectOperation string
-
-const (
-	ObjectSet ObjectOperation = "set"
-)
-
-type ObjectEvent struct {
-	// Operation denotes what happened to the object
-	Operation ObjectOperation `json:"op"`
-	// Value is the data supporting the operation
-	Value interface{} `json:"v"`
-}
-
-type ObjectObserverFunc func(event ObjectEvent)
-
-type objectObserverImpl struct {
-	key      string
-	observer ObjectObserverFunc
-}
-
-func NewObjectObserver(key string, observer ObjectObserverFunc) ObjectObserver {
-	return &objectObserverImpl{
-		key:      key,
-		observer: observer,
-	}
-}
-
-func (o *objectObserverImpl) Equals(other ObjectObserver) bool {
-	if otherImpl, ok := other.(*objectObserverImpl); ok {
-		return o.key == otherImpl.key
-	}
-	return false
-}
-
-func (o *objectObserverImpl) Observe(event ObjectEvent) {
-	o.observer(event)
 }
 
 func NewObject() *Object {
 	return &Object{}
 }
 
-func (o *Object) Subscribe(observer ObjectObserver) {
+func (o *Object) Subscribe(observer Observer) {
 	if observer == nil {
 		return
 	}
@@ -66,13 +28,13 @@ func (o *Object) Subscribe(observer ObjectObserver) {
 	o.observers = append(o.observers, observer)
 
 	// publish the current state to new subscribers:
-	observer.Observe(ObjectEvent{
+	observer.Observe(Event{
 		Operation: ObjectSet,
 		Value:     o.object,
 	})
 }
 
-func (o *Object) Unsubscribe(observer ObjectObserver) {
+func (o *Object) Unsubscribe(observer Observer) {
 	if observer == nil {
 		return
 	}
@@ -87,7 +49,7 @@ func (o *Object) Unsubscribe(observer ObjectObserver) {
 	o.unsubscribe(observer)
 }
 
-func (o *Object) unsubscribe(observer ObjectObserver) {
+func (o *Object) unsubscribe(observer Observer) {
 	for i := len(o.observers) - 1; i >= 0; i-- {
 		if observer.Equals(o.observers[i]) {
 			o.observers = append(o.observers[0:i], o.observers[i+1:]...)
@@ -105,7 +67,7 @@ func (o *Object) Set(object interface{}) {
 
 	o.object = object
 	for _, observer := range o.observers {
-		observer.Observe(ObjectEvent{
+		observer.Observe(Event{
 			Operation: ObjectSet,
 			Value:     object,
 		})
